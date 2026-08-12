@@ -104,9 +104,3 @@ data/           Capturas locales cuando se usa la CLI (fuera de Docker)
 Dockerfile      Imagen del engine (Node + Playwright)
 docker-compose.yml
 ```
-
-## Roadmap
-- Máscaras de zonas dinámicas (sliders, fechas, contadores).
-- Cola de jobs persistente + storage en S3/R2 en vez de disco local.
-- Export del informe a HTML/PDF descargable.
-- Programación de checks recurrentes.
