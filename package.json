@@ -1,0 +1,19 @@
+{
+  "name": "webreview-engine",
+  "version": "0.1.0",
+  "description": "Motor de visual regression: rastrea una web, captura pantallas y compara runs contra un baseline.",
+  "type": "module",
+  "bin": {
+    "webreview": "src/index.js"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "baseline": "node src/index.js baseline",
+    "check": "node src/index.js check"
+  },
+  "dependencies": {
+    "pixelmatch": "^6.0.0",
+    "playwright": "1.48.0",
+    "pngjs": "^7.0.0"
+  }
+}

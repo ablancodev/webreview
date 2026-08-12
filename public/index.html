@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>WebReview UI</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root { --bg:#0f172a; --panel:#111827; --border:#1f2937; --fg:#e5e7eb; --muted:#9ca3af;
+          --accent:#38bdf8; --ok:#22c55e; --warn:#f59e0b; --err:#ef4444; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+         background:var(--bg); color:var(--fg); }
+  header { padding:16px 24px; border-bottom:1px solid var(--border); display:flex; gap:16px;
+           align-items:center; background:var(--panel); position:sticky; top:0; z-index:5; }
+  header h1 { font-size:16px; margin:0; }
+  header .muted { color:var(--muted); font-size:12px; }
+  main { max-width:1200px; margin:0 auto; padding:24px; display:grid; gap:24px; }
+  .card { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:16px 20px; }
+  .card h2 { margin:0 0 12px; font-size:14px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+  label { display:block; font-size:12px; color:var(--muted); margin-bottom:6px; }
+  textarea, input[type=text] { width:100%; background:#0b1220; color:var(--fg); border:1px solid var(--border);
+                              border-radius:6px; padding:10px; font:13px ui-monospace,SFMono-Regular,Menlo,monospace; }
+  textarea { min-height:140px; resize:vertical; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+  button { background:var(--accent); color:#0b1220; border:0; border-radius:6px; padding:10px 16px;
+           font-weight:600; cursor:pointer; }
+  button.secondary { background:#334155; color:var(--fg); }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  .log { background:#0b1220; border:1px solid var(--border); border-radius:6px; padding:10px;
+         max-height:200px; overflow:auto; font:12px ui-monospace,SFMono-Regular,Menlo,monospace;
+         white-space:pre-wrap; color:#cbd5e1; }
+  .badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px;
+           background:#334155; color:var(--fg); }
+  .badge.ok { background:rgba(34,197,94,.15); color:var(--ok); }
+  .badge.changed { background:rgba(239,68,68,.15); color:var(--err); }
+  .badge.missing { background:rgba(245,158,11,.15); color:var(--warn); }
+  .summary { display:flex; gap:24px; flex-wrap:wrap; }
+  .summary div { min-width:110px; }
+  .summary .num { font-size:22px; font-weight:700; }
+  .summary .lbl { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.05em; }
+  .page { border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:14px; background:#0b1220; }
+  .page header { position:static; background:transparent; border:0; padding:0; margin-bottom:10px; display:block; }
+  .page h3 { margin:0 0 4px; font-size:14px; word-break:break-all; }
+  .page a { color:var(--accent); text-decoration:none; font-size:12px; }
+  .shots { display:grid; gap:14px; margin-top:10px; }
+  .shot { border:1px solid var(--border); border-radius:8px; padding:10px; }
+  .shot h4 { margin:0 0 8px; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; }
+  .triptych { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .triptych figure { margin:0; }
+  .triptych figcaption { font-size:11px; color:var(--muted); margin-bottom:4px; }
+  .triptych img { width:100%; border:1px solid var(--border); border-radius:4px; background:#000;
+                  cursor:zoom-in; display:block; }
+  .modal { position:fixed; inset:0; background:rgba(0,0,0,.9); display:none; align-items:center;
+           justify-content:center; padding:20px; z-index:10; }
+  .modal.open { display:flex; }
+  .modal img { max-width:100%; max-height:100%; }
+  .muted { color:var(--muted); }
+  .hidden { display:none !important; }
+</style>
+</head>
+<body>
+<header>
+  <h1>WebReview</h1>
+  <span class="muted">Motor visual regression — UI standalone</span>
+  <span style="flex:1"></span>
+  <label style="margin:0">
+    API
+    <input type="text" id="api" style="width:220px" value="http://localhost:3000">
+  </label>
+</header>
+
+<main>
+  <section class="card">
+    <h2>1 · URLs a monitorizar</h2>
+    <label for="urls">Una URL por línea</label>
+    <textarea id="urls" placeholder="https://ejemplo.com&#10;https://ejemplo.com/precios&#10;https://ejemplo.com/blog"></textarea>
+    <div class="row" style="margin-top:12px">
+      <label style="margin:0">
+        Breakpoints
+        <input type="text" id="bps" value="desktop,mobile" style="width:180px">
+      </label>
+      <label style="margin:0">
+        Umbral píxel (0-1)
+        <input type="text" id="thr" value="0.1" style="width:80px">
+      </label>
+      <label style="margin:0">
+        Ratio alerta (0-1)
+        <input type="text" id="alert" value="0.005" style="width:80px">
+      </label>
+    </div>
+    <div class="row" style="margin-top:16px">
+      <button id="btnBaseline">📸 Crear baseline</button>
+      <button id="btnCheck" class="secondary">🔍 Comparar (check)</button>
+      <span id="status" class="muted"></span>
+    </div>
+  </section>
+
+  <section class="card hidden" id="logCard">
+    <h2>Logs</h2>
+    <div class="log" id="log"></div>
+  </section>
+
+  <section class="card hidden" id="resultCard">
+    <h2>Resultado</h2>
+    <div id="summary" class="summary"></div>
+    <div id="pages" style="margin-top:20px"></div>
+  </section>
+</main>
+
+<div class="modal" id="modal"><img id="modalImg" alt=""></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const state = {
+  api: () => $("api").value.replace(/\/$/, ""),
+  site: null,          // slug del site (derivado del baseline)
+  baselineDir: null,   // ruta relativa dentro de /data
+  polling: null,
+};
+
+// Persistencia sencilla.
+const saved = JSON.parse(localStorage.getItem("webreview_ui") || "{}");
+if (saved.urls) $("urls").value = saved.urls;
+if (saved.bps) $("bps").value = saved.bps;
+if (saved.thr) $("thr").value = saved.thr;
+if (saved.alert) $("alert").value = saved.alert;
+if (saved.api) $("api").value = saved.api;
+if (saved.site) state.site = saved.site;
+if (saved.baselineDir) state.baselineDir = saved.baselineDir;
+
+function persist() {
+  localStorage.setItem("webreview_ui", JSON.stringify({
+    urls: $("urls").value, bps: $("bps").value, thr: $("thr").value,
+    alert: $("alert").value, api: $("api").value,
+    site: state.site, baselineDir: state.baselineDir,
+  }));
+}
+["urls","bps","thr","alert","api"].forEach(id => $(id).addEventListener("input", persist));
+
+function parseUrls() {
+  return $("urls").value.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+}
+
+function readOpts() {
+  return {
+    breakpoints: $("bps").value.split(",").map(s => s.trim()).filter(Boolean),
+    pixelThreshold: parseFloat($("thr").value),
+    changeRatioAlert: parseFloat($("alert").value),
+  };
+}
+
+function setStatus(msg) { $("status").textContent = msg || ""; }
+function appendLog(lines) {
+  const el = $("log");
+  el.textContent += (Array.isArray(lines) ? lines.join("\n") : lines) + "\n";
+  el.scrollTop = el.scrollHeight;
+}
+function resetLog() { $("logCard").classList.remove("hidden"); $("log").textContent = ""; }
+
+async function createJob(body) {
+  const r = await fetch(state.api() + "/jobs", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error("HTTP " + r.status + ": " + (await r.text()));
+  return r.json();
+}
+
+async function fetchJob(id) {
+  const r = await fetch(state.api() + "/jobs/" + id);
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  return r.json();
+}
+
+function pollJob(id, onDone) {
+  let lastLogLen = 0;
+  clearInterval(state.polling);
+  state.polling = setInterval(async () => {
+    try {
+      const j = await fetchJob(id);
+      if (j.logs && j.logs.length > lastLogLen) {
+        appendLog(j.logs.slice(lastLogLen));
+        lastLogLen = j.logs.length;
+      }
+      setStatus(`Job ${j.status}`);
+      if (j.status === "done" || j.status === "error") {
+        clearInterval(state.polling);
+        onDone(j);
+      }
+    } catch (e) {
+      clearInterval(state.polling);
+      setStatus("Error de polling: " + e.message);
+    }
+  }, 1000);
+}
+
+async function runBaseline() {
+  const urls = parseUrls();
+  if (!urls.length) { alert("Añade al menos una URL"); return; }
+  const opts = { ...readOpts(), urls, maxPages: urls.length };
+  resetLog();
+  $("resultCard").classList.add("hidden");
+  setStatus("Encolando baseline...");
+  try {
+    const { id } = await createJob({ type: "baseline", url: urls[0], options: opts });
+    setStatus("Baseline en cola (job " + id + ")");
+    pollJob(id, (job) => {
+      if (job.status === "error") { setStatus("Error: " + job.error); return; }
+      state.site = job.result.site;
+      state.baselineDir = job.result.baselineDir;
+      persist();
+      setStatus(`Baseline listo · ${job.result.pages} páginas · site: ${state.site}`);
+      showBaselineResult(job.result);
+    });
+  } catch (e) { setStatus("Error: " + e.message); }
+}
+
+async function runCheck() {
+  const urls = parseUrls();
+  if (!urls.length) { alert("Añade al menos una URL"); return; }
+  const opts = { ...readOpts(), urls, maxPages: urls.length };
+  resetLog();
+  $("resultCard").classList.add("hidden");
+  setStatus("Encolando check...");
+  try {
+    const { id } = await createJob({ type: "check", url: urls[0], options: opts });
+    setStatus("Check en cola (job " + id + ")");
+    pollJob(id, (job) => {
+      if (job.status === "error") { setStatus("Error: " + job.error); return; }
+      setStatus(`Check listo · ${job.result.summary.alerts} alertas / ${job.result.summary.compared} comparadas`);
+      showCheckResult(job.result);
+    });
+  } catch (e) { setStatus("Error: " + e.message); }
+}
+
+function imgUrl(relPath) {
+  return state.api() + "/data/" + relPath.replace(/\\/g, "/");
+}
+
+function showBaselineResult(r) {
+  $("resultCard").classList.remove("hidden");
+  $("summary").innerHTML = `
+    <div><div class="num">${r.pages}</div><div class="lbl">Páginas</div></div>
+    <div><div class="num">${r.breakpoints.length}</div><div class="lbl">Breakpoints</div></div>
+    <div><div class="num">${r.site}</div><div class="lbl">Site</div></div>
+  `;
+  // Solo mostramos las capturas guardadas (leyendo el manifest via API estática).
+  fetch(state.api() + "/data/" + r.baselineDir + "/manifest.json")
+    .then(res => res.json())
+    .then(manifest => {
+      $("pages").innerHTML = manifest.pages.map(p => renderBaselinePage(p, r.baselineDir)).join("");
+    }).catch(() => { $("pages").innerHTML = ""; });
+}
+
+function renderBaselinePage(p, baselineDir) {
+  const shots = Object.entries(p.shots).map(([bp, rel]) => `
+    <div class="shot">
+      <h4>${bp}</h4>
+      <figure>
+        <img src="${imgUrl(baselineDir + "/" + rel)}" onclick="openModal(this.src)">
+      </figure>
+    </div>`).join("");
+  return `<div class="page">
+    <h3>${p.slug}</h3>
+    <a href="${p.url}" target="_blank">${p.url}</a>
+    <div class="shots">${shots}</div>
+  </div>`;
+}
+
+function showCheckResult(r) {
+  $("resultCard").classList.remove("hidden");
+  const s = r.summary;
+  $("summary").innerHTML = `
+    <div><div class="num">${s.compared}</div><div class="lbl">Comparadas</div></div>
+    <div><div class="num" style="color:var(--err)">${s.alerts}</div><div class="lbl">Con cambios</div></div>
+    <div><div class="num" style="color:var(--warn)">${s.missing}</div><div class="lbl">Sin par</div></div>
+    <div><div class="num">${s.newPages.length}</div><div class="lbl">Nuevas</div></div>
+    <div><div class="num">${s.removedPages.length}</div><div class="lbl">Eliminadas</div></div>
+  `;
+  const baselineDir = state.baselineDir || `${r.site}/baseline`;
+  const html = r.report.pages.map(p => renderCheckPage(p, r.runDir, baselineDir)).join("");
+  $("pages").innerHTML = html || `<p class="muted">No hay páginas comparadas.</p>`;
+}
+
+function renderCheckPage(p, runDir, baselineDir) {
+  const shots = Object.entries(p.shots).map(([bp, s]) => {
+    if (s.status === "missing") {
+      return `<div class="shot"><h4>${bp} <span class="badge missing">missing</span></h4></div>`;
+    }
+    const badge = s.status === "changed"
+      ? `<span class="badge changed">changed · ${s.changeRatio}%</span>`
+      : `<span class="badge ok">ok · ${s.changeRatio}%</span>`;
+    return `<div class="shot">
+      <h4>${bp} ${badge}${s.dimsChanged ? ' <span class="badge missing">dims</span>' : ""}</h4>
+      <div class="triptych">
+        <figure>
+          <figcaption>Baseline</figcaption>
+          <img src="${imgUrl(baselineDir + "/" + s.baseImg)}" onclick="openModal(this.src)">
+        </figure>
+        <figure>
+          <figcaption>Actual</figcaption>
+          <img src="${imgUrl(runDir + "/" + s.newImg)}" onclick="openModal(this.src)">
+        </figure>
+        <figure>
+          <figcaption>Diff</figcaption>
+          <img src="${imgUrl(runDir + "/" + s.diff)}" onclick="openModal(this.src)">
+        </figure>
+      </div>
+    </div>`;
+  }).join("");
+  return `<div class="page">
+    <h3>${p.slug}</h3>
+    <a href="${p.url}" target="_blank">${p.url}</a>
+    <div class="shots">${shots}</div>
+  </div>`;
+}
+
+function openModal(src) {
+  $("modalImg").src = src;
+  $("modal").classList.add("open");
+}
+$("modal").addEventListener("click", () => $("modal").classList.remove("open"));
+
+$("btnBaseline").addEventListener("click", runBaseline);
+$("btnCheck").addEventListener("click", runCheck);
+</script>
+</body>
+</html>

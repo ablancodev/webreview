@@ -1,0 +1,29 @@
+services:
+  # Motor de visual regression (Playwright + API HTTP).
+  engine:
+    build: .
+    container_name: webreview-engine
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - WEBREVIEW_DATA=/data
+      - WEBREVIEW_CONCURRENCY=2
+    volumes:
+      - engine_data:/data
+    restart: unless-stopped
+
+  # Dashboard estático (HTML+JS puro contra la API del engine).
+  ui:
+    image: nginx:alpine
+    container_name: webreview-ui
+    ports:
+      - "8080:80"
+    volumes:
+      - ./public:/usr/share/nginx/html:ro
+    depends_on:
+      - engine
+    restart: unless-stopped
+
+volumes:
+  engine_data:
